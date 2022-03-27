@@ -1,0 +1,322 @@
+<?xml version="1.0" encoding="utf-8"?>
+<search>
+  <entry>
+    <title>ASP.NET Core IP 请求频率限制</title>
+    <url>/2022/03/25/ASP.NET%20Core%20IP%20%E8%AF%B7%E6%B1%82%E9%A2%91%E7%8E%87%E9%99%90%E5%88%B6/</url>
+    <content><![CDATA[<h3 id="限制IP请求频率"><a href="#限制IP请求频率" class="headerlink" title="限制IP请求频率"></a>限制IP请求频率</h3><ol>
+<li><p>NuGet安装AspNetCoreRateLimit</p>
+</li>
+<li><p>修改Startup.cs</p>
+<span id="more"></span>
+<figure class="highlight c#"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">ConfigureServices</span>(<span class="params">IServiceCollection services</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="comment">// 需要从appsettings.json中加载配置</span></span><br><span class="line">  services.AddOptions();</span><br><span class="line">  <span class="comment">// 存储IP计数器及配置规则</span></span><br><span class="line">  services.AddMemoryCache();</span><br><span class="line"></span><br><span class="line">  services.Configure&lt;IpRateLimitOptions&gt;(Configuration.GetSection(<span class="string">&quot;IpRateLimiting&quot;</span>));</span><br><span class="line">  services.AddSingleton&lt;IIpPolicyStore, MemoryCacheIpPolicyStore&gt;();</span><br><span class="line">  services.AddSingleton&lt;IRateLimitCounterStore, MemoryCacheRateLimitCounterStore&gt;();</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 按照文档，这两个是3.x版的breaking change，要加上</span></span><br><span class="line">  services.AddSingleton&lt;IHttpContextAccessor, HttpContextAccessor&gt;();</span><br><span class="line">  services.AddSingleton&lt;IRateLimitConfiguration, RateLimitConfiguration&gt;();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>使用频率限制</p>
+<figure class="highlight c#"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">Configure</span>(<span class="params">IApplicationBuilder app, IHostingEnvironment env</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">// 注意顺序，放在 UseMvc 上面</span></span><br><span class="line">    app.UseIpRateLimiting();</span><br><span class="line">    app.UseMvc();</span><br><span class="line">&#125; </span><br></pre></td></tr></table></figure>
+</li>
+<li><p>设置要限制的url</p>
+<figure class="highlight c#"><table><tr><td class="code"><pre><span class="line">[<span class="meta">Route(<span class="string">&quot;/fw/&#123;token&#125;&quot;</span>)</span>]</span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">async</span> Task&lt;IActionResult&gt; <span class="title">Forward</span>(<span class="params"><span class="built_in">string</span> token</span>)</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p>在 appsettings.json 里加入</p>
+<figure class="highlight c#"><table><tr><td class="code"><pre><span class="line"><span class="string">&quot;IpRateLimiting&quot;</span>: &#123;</span><br><span class="line">    <span class="string">&quot;EnableEndpointRateLimiting&quot;</span>: <span class="literal">true</span>, <span class="comment">//IP限制会应用于单个配置的Endpoint上。如果是false的话，只会限制所有 * 的规则，而不能达到针对单个Endpoint配置的目的</span></span><br><span class="line">    <span class="string">&quot;StackBlockedRequests&quot;</span>: <span class="literal">false</span>,</span><br><span class="line">    <span class="string">&quot;RealIpHeader&quot;</span>: <span class="string">&quot;X-Real-IP&quot;</span>,</span><br><span class="line">    <span class="string">&quot;ClientIdHeader&quot;</span>: <span class="string">&quot;X-ClientId&quot;</span>,</span><br><span class="line">    <span class="string">&quot;HttpStatusCode&quot;</span>: <span class="number">429</span>,<span class="comment">//触发限制之后给客户端返回的HTTP状态码</span></span><br><span class="line">    <span class="string">&quot;GeneralRules&quot;</span>: [</span><br><span class="line">      &#123;<span class="comment">//*: 表示任何HTTP VERB，如GET/POST，而结尾的 /* 表示需要考虑/fw后面的参数，也就是我MVC Action参数里的route参数。针对不同token，会有不同的计数</span></span><br><span class="line">        <span class="string">&quot;Endpoint&quot;</span>: <span class="string">&quot;*:/fw/*&quot;</span>,</span><br><span class="line">        <span class="string">&quot;Period&quot;</span>: <span class="string">&quot;1m&quot;</span>,</span><br><span class="line">        <span class="string">&quot;Limit&quot;</span>: <span class="number">2</span></span><br><span class="line">      &#125;</span><br><span class="line">    ]</span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
+<p><code>还有针对Client ID而不是IP做限制、白名单、分布式计数器存储、自定义返回内容等等</code></p>
+</li>
+</ol>
+]]></content>
+      <categories>
+        <category>Web</category>
+      </categories>
+      <tags>
+        <tag>Asp.Net Core</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Asp.Net Core中的配置和服务注入</title>
+    <url>/2022/03/25/Asp.Net%20Core%E4%B8%AD%E7%9A%84%E9%85%8D%E7%BD%AE%E5%92%8C%E6%9C%8D%E5%8A%A1%E6%B3%A8%E5%85%A5/</url>
+    <content><![CDATA[<h3 id="Startup类"><a href="#Startup类" class="headerlink" title="Startup类"></a>Startup类</h3><p><code>Program</code>里面的<code>CreateWebHostBuilder</code>方法默认使用<code>Startup</code>类。<br><code>Startup</code>：</p>
+<span id="more"></span>
+<ul>
+<li>可选择性的包含<code>ConfigureServices</code>方法以及配置应用服务</li>
+<li>必须包含<code>Configure</code>方法以创建应用的请求处理管道,常见中间件管道顺序：<br> 1.异常&#x2F;错误处理<br> 2.HTTP严格传输安全协议<br> 3.HTTPS重定向<br> 4.静态文件服务器<br> 5.Cookie策略实施<br> 6.身份验证<br> 7.会话<br> 8.MVC<br>  Configure方法使用<code>IApplicationBuilder</code>来使用中间件<br>   有Use，Map，Run三种使用方式：<br> 1.Use使用中间件配置请求管道<br> 2.Map管道分支<br> 3.Run管道短路</li>
+</ul>
+<p>———–         ###</p>
+<h3 id="Configure方法里注入IConfiguration接口，读取-appsettings-json配置"><a href="#Configure方法里注入IConfiguration接口，读取-appsettings-json配置" class="headerlink" title="Configure方法里注入IConfiguration接口，读取 appsettings.json配置"></a>Configure方法里注入IConfiguration接口，读取 appsettings.json配置</h3><figure class="highlight c#"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">Configure</span>(<span class="params">IApplicationBuilder app,IHostingEnvironment env,IConfiguration configuration</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="keyword">if</span>(env.IsDevelopment())</span><br><span class="line">  &#123;</span><br><span class="line">  	app.UseDevelopmerExceptionPage();</span><br><span class="line">  &#125;</span><br><span class="line">  app.Run(<span class="keyword">async</span>(context)=&gt;</span><br><span class="line">    &#123;</span><br><span class="line">    	<span class="comment">//appsettings.json里面添加的key是Welcome,值为Hello World！</span></span><br><span class="line">      <span class="keyword">var</span> welcome=configuration[<span class="string">&quot;Welcome&quot;</span>];</span><br><span class="line">      <span class="keyword">await</span> context.Response.WriteAsync(welcome);</span><br><span class="line">  	&#125;);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<blockquote>
+<p>运行结果：Hello World！</p>
+</blockquote>
+<hr>
+<h3 id="ConfigureServices配置应用服务"><a href="#ConfigureServices配置应用服务" class="headerlink" title="ConfigureServices配置应用服务"></a>ConfigureServices配置应用服务</h3><figure class="highlight c#"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">ConfigureServices</span>(<span class="params">IServiceCollection services</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="comment">//服务注入             &lt;接口，实现接口的类&gt;</span></span><br><span class="line">	services.AddSingleton&lt;IWelcomeService,WelcomeService&gt;();</span><br><span class="line">	<span class="comment">//AddSingleton只能有WelcomeService实例</span></span><br><span class="line">	<span class="comment">//AddTransient每请求一次方法就创建一个实例</span></span><br><span class="line">	<span class="comment">//AddScoped 整个HTTP请求只创建一个实例</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">Configure</span>(<span class="params">IApplicationBUilder app,IHostingEnvironment env,IWelcomeService welcomeService</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="keyword">if</span>(env.IsDevelopment())</span><br><span class="line">	&#123;</span><br><span class="line">		app.UseDeveloperExceptionPage();</span><br><span class="line">	&#125;</span><br><span class="line">	app.Run(<span class="keyword">async</span>(context)=&gt;</span><br><span class="line">	&#123;</span><br><span class="line">		<span class="comment">//调用GetMessage方法</span></span><br><span class="line">      <span class="keyword">var</span> welcome=welcomeService.GetMessage();</span><br><span class="line">      <span class="keyword">await</span> context.Response.WriteAsync(welcome);</span><br><span class="line">    &#125;);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="IWlcomeService接口及实现"><a href="#IWlcomeService接口及实现" class="headerlink" title="IWlcomeService接口及实现"></a>IWlcomeService接口及实现</h3><figure class="highlight c#"><table><tr><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">interface</span> <span class="title">IWelcomeService</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="function"><span class="built_in">string</span> <span class="title">GetMessage</span>()</span>;</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title">WelcomeService</span>:<span class="title">IWelcomeService</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="function"><span class="keyword">public</span> <span class="built_in">string</span> <span class="title">GetMessage</span>()</span></span><br><span class="line">	&#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="string">&quot;Hello from IWelcome service!&quot;</span>;</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<blockquote>
+<p>运行结果:Hello from IWelcome service!</p>
+</blockquote>
+]]></content>
+      <categories>
+        <category>Web</category>
+      </categories>
+      <tags>
+        <tag>Asp.Net Core</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Asp.Net Core中间件和路由</title>
+    <url>/2022/03/25/Asp.Net%20Core%E4%B8%AD%E9%97%B4%E4%BB%B6%E5%92%8C%E8%B7%AF%E7%94%B1/</url>
+    <content><![CDATA[<h3 id="注入日志中间件"><a href="#注入日志中间件" class="headerlink" title="注入日志中间件"></a>注入日志中间件</h3><figure class="highlight c#"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">Configure</span>(<span class="params">IApplicationBuilder app,IHostingEnvironment env,IWelcomeService welcomeService,ILogger&lt;Startup&gt; logger</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="comment">//Use在启动配置的时候走了一遍，只运行一次</span></span><br><span class="line">  app.Use(next=&gt;</span><br><span class="line">  &#123;</span><br><span class="line">   logger.LogInformation(<span class="string">&quot;app.Use()......&quot;</span>);<span class="comment">//使用日志</span></span><br><span class="line">   <span class="comment">//请求没有拦截的话，请求每次都会运行</span></span><br><span class="line">   <span class="keyword">return</span> <span class="keyword">async</span> httpContext=&gt;</span><br><span class="line">   &#123;</span><br><span class="line">  	 logger.LogInformation(<span class="string">&quot;----async httpContext&quot;</span>);</span><br><span class="line">  	 <span class="keyword">if</span>(httpContext.Request.Path.StartsWithSegments(<span class="string">&quot;/first&quot;</span>))</span><br><span class="line">  	 &#123;</span><br><span class="line">  	   logger.LogInformation(<span class="string">&quot;----First!!!&quot;</span>);</span><br><span class="line">  	   <span class="keyword">await</span> httpContext.Response.WriteAsync(<span class="string">&quot;First!!!&quot;</span>);</span><br><span class="line">  	 &#125;</span><br><span class="line">  	 <span class="keyword">else</span></span><br><span class="line">  	 &#123;</span><br><span class="line">  	   logger.LogInformation(<span class="string">&quot;----next(httpContext)&quot;</span>);</span><br><span class="line">  	   <span class="keyword">await</span> next(httpContext);<span class="comment">//没有访问first目录，继续往下走</span></span><br><span class="line">  	 &#125;</span><br><span class="line">    &#125;;</span><br><span class="line">  &#125;);</span><br><span class="line"></span><br><span class="line">  app.Run(<span class="keyword">async</span>(context)=&gt;</span><br><span class="line">  &#123;</span><br><span class="line">   <span class="keyword">var</span> welcome=welcomeService.GetMessage();</span><br><span class="line">   <span class="keyword">await</span> context.Response.WriteAsync(welcome);</span><br><span class="line">  &#125;);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<span id="more"></span>
+<hr>
+<h3 id="使用路由"><a href="#使用路由" class="headerlink" title="使用路由"></a>使用路由</h3><p>路由分为：1.Convention Route(约定路由)  2.Attribute Route(属性路由),不能混用</p>
+<h3 id="约定路由："><a href="#约定路由：" class="headerlink" title="约定路由："></a>约定路由：</h3><figure class="highlight c#"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">Configure</span>(<span class="params">....</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="comment">//创建wwwroot文件夹，新建index.html，使用app.UseFileServer()才能访问</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">//使用默认路由配置的mvc</span></span><br><span class="line">	app.UseStaticFiles();</span><br><span class="line">	<span class="comment">//app.UseMvcWithDefaultRoute();</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">//手动配置约定路由 /Home/Index/3</span></span><br><span class="line">	app.useMvc(builder=&gt;</span><br><span class="line">		&#123;</span><br><span class="line">			<span class="comment">//自定义路由 （名称，模板规则）如果目录没有Home，Index，默认使用Home，Index</span></span><br><span class="line">			builder.MapRoute(<span class="string">&quot;Default&quot;</span>,<span class="string">&quot;&#123;controller=Home&#125;/&#123;action=Index&#125;/&#123;id?&#125;&quot;</span>);</span><br><span class="line">		&#125;);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<blockquote>
+<p>访问网站根目录即可到达Index页面</p>
+</blockquote>
+<h3 id="属性路由"><a href="#属性路由" class="headerlink" title="属性路由"></a>属性路由</h3><p>新建一个<code>AboutController</code>类</p>
+<figure class="highlight c#"><table><tr><td class="code"><pre><span class="line"><span class="comment">//按照路径，先访问控制器名，再访问方法</span></span><br><span class="line">[<span class="meta">Route(<span class="string">&quot;[controller]/[action]&quot;</span>)</span>]</span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title">AboutController</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="function"><span class="keyword">public</span> <span class="built_in">string</span> <span class="title">Me</span>()</span></span><br><span class="line">	&#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="string">&quot;Dave&quot;</span>;</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="function"><span class="keyword">public</span> <span class="built_in">string</span> <span class="title">Company</span>()</span></span><br><span class="line">	&#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="string">&quot;No Company&quot;</span>;</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<blockquote>
+<p>&#x2F;about&#x2F;me  返回<code>Dave</code></p>
+</blockquote>
+]]></content>
+      <categories>
+        <category>Web</category>
+      </categories>
+      <tags>
+        <tag>Asp.Net Core</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>EFCore基础</title>
+    <url>/2022/03/25/EFCore%E5%9F%BA%E7%A1%80/</url>
+    <content><![CDATA[<h3 id="种子数据库"><a href="#种子数据库" class="headerlink" title="种子数据库"></a>种子数据库</h3><p>&#x2F;&#x2F;查看EFCore命令：get-help entityframeworkcore<br>&#x2F;&#x2F;script-migration 生成sql脚本</p>
+<figure class="highlight c#"><table><tr><td class="code"><pre><span class="line"><span class="comment">//Model里有一个省份Province，一个城市City</span></span><br><span class="line"><span class="comment">//在 DBContex 里：</span></span><br><span class="line"><span class="function"><span class="keyword">protected</span> <span class="keyword">override</span> <span class="keyword">void</span> <span class="title">OnModelCreating</span>(<span class="params">ModelBuilder modelBuilder</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="comment">//添加了一个省份的种子，Id是自增的</span></span><br><span class="line">   modelBuilder.Entity&lt;Province&gt;().HasData(</span><br><span class="line">        <span class="keyword">new</span> Province</span><br><span class="line">        &#123;</span><br><span class="line">        	Id = <span class="number">1</span>,</span><br><span class="line">        	Name=<span class="string">&quot;广东&quot;</span>,</span><br><span class="line">        	Populiation=<span class="number">70000000</span></span><br><span class="line">        &#125;);</span><br><span class="line">&#125;</span><br><span class="line">生成迁移：</span><br><span class="line">Add-Migration xxx</span><br></pre></td></tr></table></figure>
+<span id="more"></span>
+<h3 id="获取客户端IP地址"><a href="#获取客户端IP地址" class="headerlink" title="获取客户端IP地址"></a>获取客户端IP地址</h3><figure class="highlight c#"><table><tr><td class="code"><pre><span class="line">在Startup.cs里：</span><br><span class="line">services.AddHttpContextAccessor();</span><br><span class="line">service.TryAddSingleton&lt;IActionContextAccessor,ActionContextAccessor&gt;();</span><br><span class="line"></span><br><span class="line">在MVC视图里：</span><br><span class="line">@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor</span><br><span class="line">使用方法：</span><br><span class="line">Client IP: @HttpContextAccessor.HttpContext.Connection.RemoteIpAddress.ToString()</span><br></pre></td></tr></table></figure>
+
+<h3 id="Session-和-Cookie"><a href="#Session-和-Cookie" class="headerlink" title="Session 和 Cookie"></a>Session 和 Cookie</h3><figure class="highlight c#"><table><tr><td class="code"><pre><span class="line"><span class="number">1.</span> 手动添加Session支持：</span><br><span class="line">services.AddDistributedMemoryCache();</span><br><span class="line">services.AddSession(options=&gt;</span><br><span class="line">&#123;</span><br><span class="line">	options.IdleTimeOut = TimeSpan.FromMinutes(<span class="number">20</span>);</span><br><span class="line">	options.Cookie.HttpOnly = <span class="literal">true</span>;</span><br><span class="line">&#125;);</span><br><span class="line"><span class="number">2.</span> app.UseSession();</span><br><span class="line"><span class="number">3.</span> 设定和获取Session值：</span><br><span class="line">HttpContest.Session.SetString(<span class="string">&quot;CaptchaCode&quot;</span>,resultCaptchaCode);</span><br><span class="line">HttpContext.Session.GetString(<span class="string">&quot;CaptchaCode&quot;</span>);</span><br><span class="line"> 清除值：</span><br><span class="line"> context.Session.Remove(<span class="string">&quot;CaptchaCode&quot;</span>);</span><br></pre></td></tr></table></figure>]]></content>
+      <categories>
+        <category>ASP.NetCore</category>
+      </categories>
+      <tags>
+        <tag>基础</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>GtiHub+Hexo搭建个人博客</title>
+    <url>/2022/03/25/GtiHub-Hexo%E6%90%AD%E5%BB%BA%E4%B8%AA%E4%BA%BA%E5%8D%9A%E5%AE%A2/</url>
+    <content><![CDATA[<img src='/images/搭建个人博客.jpg'>
+>这是引用
+
+<span id="more"></span>
+<p>1,注册GitHub，创建仓库，仓库名：你的GitHub用户名.github.io(必须这种格式)</p>
+<p>2,在官网<a href="https://git-scm.com/download/win" title="下载">下载</a>，安装git。我们的网站本地搭建好需要用git同步到GitHub上。<br>开始菜单里打开<code>Git here bash</code>，配置信息：</p>
+<pre><code>git config --global user.name &quot;你的GitHub用户名&quot; (Enter执行)
+git config --global user.email &quot;你的GitHub注册邮箱&quot; (Enter执行)
+</code></pre>
+<p>本地生成ssh密钥文件（连接Github需要）：</p>
+<figure class="highlight excel"><table><tr><td class="code"><pre><span class="line">ssh-keygen -<span class="built_in">t</span> rsa -C <span class="string">&quot;你的GitHub注册邮箱&quot;</span> </span><br></pre></td></tr></table></figure>
+<p>然后三个回车，默认不设置密码。</p>
+<p>3,然后在.ssh文件夹中用Notepad++ 打开id_rsa.pub密钥，将内容全部复制<br>在GitHub个人下点settings,打开SSH and GPR keys项，新建 new SSH Key：标题随便写，将密钥复制到key新建。</p>
+<p>4,在Git Bash中检测公钥是否可用，输入:<br> <code>ssh git@github.com</code><br> 如果显示成功，这就完成了<code>Git</code>与<code>GitHub</code>绑定</p>
+<p>5,安装Node.js<br>Hexo是基于Node.js的,Node.js包含环境变量及npm的安装。</p>
+<p>6,安装Hexo<br>Hexo是博客网站框架。<br>利用npm命令全局安装：<br>npm install -g hexo<br>在电脑上创建一个文件夹，命名myblog，然后鼠标右键文件夹 Git Bash Her<br>安装完后 初始化博客：<br>hexo init<br>安装依赖包：<br>    npm install<br>初始化完 检测运行一下：<br>hexo g   # 生成(g是generate缩写)<br>hexo s<br>然后再浏览器中打开localhost:4000,就可以打开博客首页</p>
+<h3 id="常用的Hexo命令："><a href="#常用的Hexo命令：" class="headerlink" title="常用的Hexo命令："></a>常用的Hexo命令：</h3><p>npm install hexo -g #全局安装Hexo<br>npm update hexo -s #升级<br>hexo init  #初始化博客</p>
+<h3 id="命令简写："><a href="#命令简写：" class="headerlink" title="命令简写："></a>命令简写：</h3><p>hexo n “文章名” &#x3D;&#x3D; hexo new “文章名” #新建文章<br>hexo g &#x3D;&#x3D; hexo generate #生成<br>hexo s &#x3D;&#x3D; hexo server #启用服务预览<br>hexo d &#x3D;&#x3D;hexo deploy #部署本地网页到GitHub</p>
+<p>hexo server  #Hexo会监视文件改变并自动更新，，无需重启服务<br>hexo server -s #静态模式<br>hexo server -p 5000 #改变端口</p>
+<figure class="highlight axapta"><table><tr><td class="code"><pre><span class="line">$ hexo <span class="keyword">server</span></span><br></pre></td></tr></table></figure>
+<p>hexo server -i 192.168.0.1 #自定义IP<br>hexo clean #清楚缓存</p>
+<p>7,把Hexo与GitHub关联起来，打开站点配置文件myblog&#x2F;_config.yml,翻到最后修改为：<br>deploy:<br>  type: git #注意空格<br>  ropo: <a href="mailto:&#103;&#x69;&#116;&#64;&#103;&#x69;&#x74;&#104;&#117;&#x62;&#x2e;&#x63;&#111;&#109;">&#103;&#x69;&#116;&#64;&#103;&#x69;&#x74;&#104;&#117;&#x62;&#x2e;&#x63;&#111;&#109;</a>:你的GitHub用户名&#x2F;你的GitHub用户名.github.io.git<br>  branch: master<br>保存站点配置文件  </p>
+<p>安装Git部署插件：<br>npm install hexo-deployer-git –save<br>完成后执行：<br>hexo clean<br>hexo g<br>hexo d<br>这样你的网站被部署在GitHub上了，可以网络访问  你的GitHub用户名.github.io</p>
+<hr>
+<h3 id="修改文章内链接样式"><a href="#修改文章内链接样式" class="headerlink" title="修改文章内链接样式"></a>修改文章内链接样式</h3><p>修改文件 themes\next\source\css_common\components\post\post.styl，在末尾添加如下css样式，：<br>    &#x2F;&#x2F; 文章内链接文本样式<br>.post-body p a{<br>  color: #0593d3;<br>  border-bottom: none;<br>  border-bottom: 1px solid #0593d3;<br>  &amp;:hover {<br>    color: #fc6423;<br>    border-bottom: none;<br>    border-bottom: 1px solid #fc6423;<br>  }<br>}</p>
+<hr>
+<h3 id="文章添加分类"><a href="#文章添加分类" class="headerlink" title="文章添加分类"></a>文章添加分类</h3><p>定位到站点目录下:<br>    hexo new page categories<br>编辑刚新建的页面，将页面的 type 设置为 categories ，主题将自动为这个页面显示分类。页面内容如下：<br>title: 分类<br>date: 2014-12-22 12:39:04<br>type: “categories”</p>
+<hr>
+<p>在菜单中添加链接。编辑 主题配置文件 ， 添加 categories 到 menu 中，如下:<br>menu:<br>  home: &#x2F;<br>  archives: &#x2F;archives<br>  categories: &#x2F;categories</p>
+<hr>
+<h3 id="添加标签"><a href="#添加标签" class="headerlink" title="添加标签"></a>添加标签</h3><p>在终端窗口下，定位到 Hexo 站点目录下。使用 hexo new page 新建一个页面，命名为 tags ：<br>$ cd your-hexo-site<br>$ hexo new page tags<br>编辑刚新建的页面，将页面的类型设置为 tags ，主题将自动为这个页面显示标签云。页面内容如下：<br>title: 标签<br>date: 2014-12-22 12:39:04<br>type: “tags”</p>
+<hr>
+<p>在菜单中添加链接。编辑 主题配置文件 ， 添加 tags 到 menu 中，如下:<br>menu:<br>  home: &#x2F;<br>  archives: &#x2F;archives<br>  tags: &#x2F;tags</p>
+<hr>
+<h3 id="百度谷歌收录你的站点"><a href="#百度谷歌收录你的站点" class="headerlink" title="百度谷歌收录你的站点"></a>百度谷歌收录你的站点</h3>  <figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ npm install hexo-generator-sitemap --save  <span class="comment">#google</span></span><br><span class="line">npm install hexo-generator-baidu-sitemap --save <span class="comment">#百度</span></span><br></pre></td></tr></table></figure>
+
+<hr>
+<h3 id="添加本地搜索"><a href="#添加本地搜索" class="headerlink" title="添加本地搜索"></a>添加本地搜索</h3>  <figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ npm install hexo-generator-searchdb --save</span><br></pre></td></tr></table></figure>
+<p>  站点配置文件，任意位置新增：<br>  <figure class="highlight dts"><table><tr><td class="code"><pre><span class="line"><span class="symbol">search:</span></span><br><span class="line"><span class="symbol">  path:</span> search.xml</span><br><span class="line"><span class="symbol">  filed:</span> post</span><br><span class="line"><span class="symbol">  format:</span> html</span><br><span class="line"><span class="symbol">  limit:</span> <span class="number">10000</span></span><br></pre></td></tr></table></figure><br>  编辑主题配置文件，启用搜索:</p>
+<pre><code class="bash">local_serach:
+  enable: true
+</code></pre>
+]]></content>
+      <categories>
+        <category>Web</category>
+      </categories>
+      <tags>
+        <tag>GitGub</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>git命令</title>
+    <url>/2022/03/25/git%E5%91%BD%E4%BB%A4/</url>
+    <content><![CDATA[<h3 id="CMD"><a href="#CMD" class="headerlink" title="CMD"></a>CMD</h3><figure class="highlight c#"><table><tr><td class="code"><pre><span class="line">sc 是用来与服务控制管理器和服务进行通信</span><br><span class="line">dir 显示当前目录中的文件</span><br><span class="line">dir /? 查看dir帮助</span><br><span class="line"><span class="keyword">set</span> 查看所有环境变量</span><br><span class="line">cd ..  返回上一级目录</span><br><span class="line">type nul &gt; test.txt 创建test.txt空文件</span><br><span class="line">del file_name 删除文件</span><br><span class="line">notepad test.txt 打开test.txt</span><br><span class="line">type test.txt 读取test.txt</span><br><span class="line">echo &gt; test.txt echo打开 写入test.txt(没有文件就创建)</span><br><span class="line">rd/s/q 盘符:\某个文件夹  （强制删除文件文件夹和文件夹内所有文件）</span><br><span class="line">del/f/s/q 盘符:\文件名  （强制删除文件，文件名必须加文件后缀名）</span><br><span class="line">net user 查看本机账户情况</span><br><span class="line">net share 查看共享资源</span><br><span class="line">net share delname/delete 删除共享文件夹</span><br><span class="line">nslookup github.com 查看github服务器ip</span><br><span class="line">netsh wlan show profile wifiname  key=clear 查看已连接的wifi信息</span><br></pre></td></tr></table></figure>
+<span id="more"></span>
+<h3 id="git"><a href="#git" class="headerlink" title="git"></a>git</h3><figure class="highlight c#"><table><tr><td class="code"><pre><span class="line">git <span class="keyword">init</span> 在当前目录初始化一个仓库</span><br><span class="line">git remote show 查看仓库名</span><br><span class="line">git remote rename oldName newName  改为newName</span><br><span class="line">git <span class="keyword">add</span> test.txt 把当前目录中test.txt添加到本地git仓库(git <span class="keyword">add</span> . 添加所有)</span><br><span class="line">git status 查看仓库中文件状态</span><br><span class="line">git commit -m <span class="string">&quot;描述信息&quot;</span>  -a  提交所有已更改的commit文件</span><br><span class="line">git commit test.txt --amend 把文件提交的最近<span class="number">2</span>条日志覆盖为最新的一条</span><br><span class="line">git diff test.txt 在仓库目录,test.txt已提交和暂存区的差异</span><br><span class="line"></span><br><span class="line">git commit --amend 修改最近一次的commit描述</span><br><span class="line">git rebase -i HEAD~<span class="number">3</span> 修改commit倒数第三条</span><br><span class="line">修改后执行 git rebase --<span class="keyword">continue</span>  git push -f </span><br><span class="line"></span><br><span class="line">git log  查看提交日志(返回<span class="number">324b</span>7...是提交的版本号)</span><br><span class="line">git log <span class="number">-2</span> -p 最新的<span class="number">2</span>条更新及改动详情</span><br><span class="line">git log --since=<span class="number">2.</span>weeks 最近两周以内的提交</span><br><span class="line">git log test.txt 查看test.txt更新日志</span><br><span class="line">git log --pretty=oneline 在一行上精简显示日志</span><br><span class="line"></span><br><span class="line">git rm test.txt 仓库和本地都删除</span><br><span class="line">git rm --cached test.txt 从已提交移除,变为untrack</span><br><span class="line">del test.txt 删除test.txt</span><br><span class="line">git reset HEAD test.txt 从仓库撤销到暂存区</span><br><span class="line">git checkout -- test.txt 让这个文件回到最近一次git commit或git <span class="keyword">add</span>时的状态</span><br><span class="line">git reset --hard <span class="number">324b</span>7  根据日志号前几位回滚</span><br><span class="line">git reflog 回滚后,查看命令历史,以便回到未来</span><br><span class="line">git remote -v 查看当前配置的远程仓库</span><br><span class="line">git remote rename test.txt <span class="keyword">new</span>.txt  test改名为<span class="keyword">new</span></span><br><span class="line">git ls-files 查看仓库中已提交文件</span><br><span class="line">git mv test.txt testNew.txt 改名为testNew.txt</span><br><span class="line">git tag v0<span class="number">.1</span> <span class="number">3</span>d2342 按照版本号打标签</span><br><span class="line">git tag -d v0<span class="number">.1</span> 按版本号删除</span><br><span class="line">git show v0<span class="number">.1</span> 按标签号查看提交信息</span><br><span class="line">git checkout v0<span class="number">.1</span> 按标签号回滚,日志也回滚</span><br><span class="line">git reset --hard b65bb6f  按照日志号回滚到未来或过去</span><br></pre></td></tr></table></figure>
+
+
+<h3 id="配置git"><a href="#配置git" class="headerlink" title="配置git"></a>配置git</h3><figure class="highlight c#"><table><tr><td class="code"><pre><span class="line">ssh-keygen -t rsa -C <span class="string">&quot;github上注册的邮箱&quot;</span>  创建本地ssh key</span><br><span class="line">ssh -T git@github.com  验证是否配置成功</span><br><span class="line">git config --<span class="keyword">global</span> user.name <span class="string">&quot;github用户名&quot;</span></span><br><span class="line">git config --<span class="keyword">global</span> user.email <span class="string">&quot;注册github的邮箱&quot;</span></span><br><span class="line">git config --list 查看git已有配置信息</span><br></pre></td></tr></table></figure>
+
+<h3 id="提交到GitHub"><a href="#提交到GitHub" class="headerlink" title="提交到GitHub"></a>提交到GitHub</h3><figure class="highlight c#"><table><tr><td class="code"><pre><span class="line">git clone url 从远程克隆仓库到当前目录</span><br><span class="line">git push 自己取的仓库名 v0<span class="number">.1</span> 推送标签到远程仓库</span><br><span class="line">git push -u origin master 第一次推送到远程仓库origin的master分支</span><br><span class="line">git fetch 获取远程仓库里（别人提交的）未同步的更新信息，并存放到本地仓库</span><br><span class="line">git merge 将fetch得到的更新同步到工作区（分支合并）</span><br><span class="line">git pull 等价于 fetch + merge</span><br><span class="line">git config receive.denyCurrentBranch ignore  本地克隆push报错denyCurrentBranch,在远程设置接收配置</span><br><span class="line">git push origin feature   推送到远程origin,如果没有feature就远程创建</span><br></pre></td></tr></table></figure>
+
+<h3 id="分支"><a href="#分支" class="headerlink" title="分支"></a>分支</h3><figure class="highlight c#"><table><tr><td class="code"><pre><span class="line">git <span class="keyword">init</span> --bare 创建裸仓库(远程端)</span><br><span class="line">git remote <span class="keyword">add</span> dev url  在url上创建远程仓库dev</span><br><span class="line">git checkout -b rel  强制创建rel分支</span><br></pre></td></tr></table></figure>
+
+<h3 id="本地磁盘提交"><a href="#本地磁盘提交" class="headerlink" title="本地磁盘提交"></a>本地磁盘提交</h3><figure class="highlight c#"><table><tr><td class="code"><pre><span class="line"><span class="number">1</span>,初始化两个文件夹sample,remote</span><br><span class="line"><span class="number">2</span>,两文件夹:git <span class="keyword">init</span></span><br><span class="line"><span class="number">3</span>,sample里创建文件并commit</span><br><span class="line"><span class="number">4</span>,添加远程仓库:git remote <span class="keyword">add</span> origin c:\..\remote </span><br><span class="line"><span class="number">5</span>,remote路径下:git config receive.dencyCurrentBranch ignore</span><br><span class="line"><span class="number">6</span>,sample推送:git push origin master</span><br></pre></td></tr></table></figure>
+
+<h3 id="推送到GitHub"><a href="#推送到GitHub" class="headerlink" title="推送到GitHub"></a>推送到GitHub</h3><figure class="highlight c#"><table><tr><td class="code"><pre><span class="line"><span class="number">1</span>,在GitHub上创建仓库,ignore选Visual Studio,添加readme.</span><br><span class="line"><span class="number">2</span>,本地:git clone git@github.com:username/sample.git</span><br><span class="line"><span class="number">3</span>,本地commit后:<span class="function">git push origin <span class="title">master</span> (<span class="params">远程默认名origin</span>)</span></span><br></pre></td></tr></table></figure>
+]]></content>
+      <categories>
+        <category>git</category>
+      </categories>
+      <tags>
+        <tag>基础</tag>
+        <tag>git</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>xUnit.NET对.NET Core单元测试</title>
+    <url>/2022/03/25/xUnit.NET%E5%AF%B9.NET%20Core%E5%8D%95%E5%85%83%E6%B5%8B%E8%AF%95/</url>
+    <content><![CDATA[<h3 id="为什么要自动化测试"><a href="#为什么要自动化测试" class="headerlink" title="为什么要自动化测试"></a>为什么要自动化测试</h3><ol>
+<li>可以频繁进行测试</li>
+<li>可以在任何时间测试,也可以按计划进行</li>
+<li>比人工测试快,更快发现错误</li>
+<li>非常可靠,测试代码与生产代码紧密结合</li>
+<li>使得开发团队更具幸福感</li>
+</ol>
+]]></content>
+      <categories>
+        <category>Web</category>
+      </categories>
+      <tags>
+        <tag>Asp.Net Core</tag>
+        <tag>xUnit</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>C#基础</title>
+    <url>/2022/03/25/%E5%9F%BA%E7%A1%80/</url>
+    <content><![CDATA[<p>mian方法可以返回int，通常是0，不是0，就发生了错误</p>
+<span id="more"></span>
+<figure class="highlight c#"><table><tr><td class="code"><pre><span class="line"> <span class="keyword">var</span> b = <span class="number">0b1001</span>;<span class="comment">//前面加上0b二进制</span></span><br><span class="line"> <span class="keyword">var</span> a = <span class="number">0x4F</span>;<span class="comment">//16进制</span></span><br><span class="line"> Console.WriteLine(<span class="number">1.0</span> / <span class="number">0.0</span>);<span class="comment">//∞</span></span><br><span class="line"> Console.WriteLine(<span class="number">-1.0</span> / <span class="number">0.00</span>);<span class="comment">// -∞</span></span><br><span class="line"> Console.WriteLine(<span class="number">1.0</span>/<span class="number">-0.00</span>);<span class="comment">//-∞</span></span><br><span class="line"> Console.WriteLine(<span class="number">-1.0</span>/<span class="number">-0.0</span>);<span class="comment">//∞</span></span><br><span class="line"></span><br><span class="line"><span class="comment">//NaN 和 NaN不相等，使用Object.Equal()时相等。</span></span><br><span class="line">Console.WriteLine(<span class="number">0.0</span>/<span class="number">0.0</span>);<span class="comment">//NaN</span></span><br><span class="line">Console.WriteLine((<span class="number">1.0</span>/<span class="number">0.0</span>)-(<span class="number">1.0</span>/<span class="number">0.0</span>));<span class="comment">//NaN</span></span><br><span class="line">Console.WriteLine((<span class="number">0.0</span>/<span class="number">0.0</span>)==<span class="built_in">double</span>.NaN);<span class="comment">//false</span></span><br><span class="line">Console.WriteLine(<span class="built_in">object</span>.Equals((<span class="number">0.0</span>/<span class="number">0.0</span>),<span class="built_in">double</span>.NaN));<span class="comment">//true</span></span><br><span class="line"><span class="comment">//double 特殊值：+0,-0,∞,-∞,NaN</span></span><br><span class="line">```            </span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> 和 <span class="keyword">static</span> <span class="keyword">readonly</span>区别：</span><br><span class="line"><span class="number">1.</span> <span class="keyword">const</span>（静态常量）:</span><br><span class="line">  在编译期间解析的常量</span><br><span class="line">  必须声明就初始化(<span class="built_in">int</span>,<span class="built_in">float</span>,枚举,字符串。不能<span class="keyword">new</span>)</span><br><span class="line">  可修饰类中成员，也可修饰函数体内局部变量</span><br><span class="line"><span class="number">2.</span> <span class="keyword">static</span> <span class="keyword">readonly</span>（动态常量）:</span><br><span class="line">  在运行期间解析的常量</span><br><span class="line">  可在声明时初始化，也可在构造器中初始化</span><br><span class="line">  只修饰类中成员 </span><br><span class="line"></span><br><span class="line"></span><br><span class="line">去掉集合里的重复数据</span><br><span class="line">```C<span class="meta">#</span></span><br><span class="line"><span class="built_in">int</span>[] a=&#123;<span class="number">1</span>,<span class="number">2</span>,<span class="number">3</span>,<span class="number">3</span>,,<span class="number">5</span>,<span class="number">5</span>,<span class="number">7</span>,<span class="number">3</span>,<span class="number">1</span>,<span class="number">4</span>&#125;;</span><br><span class="line">HasSet&lt;<span class="built_in">int</span>&gt; hs = <span class="keyword">new</span> HasSet&lt;<span class="built_in">int</span>&gt;(a);</span><br><span class="line"><span class="keyword">foreach</span>(<span class="keyword">var</span> item <span class="keyword">in</span> hs)</span><br><span class="line">&#123;</span><br><span class="line">	Console.WriteLine(item+ <span class="string">&quot; &quot;</span>);</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">//无限循环</span></span><br><span class="line"><span class="keyword">for</span>(; ;)</span><br><span class="line">&#123;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>空接合操作符<br><code>x??y??z</code> 如果之前所有表达式为空，就选择最后一个</p>
+<p>continue语句</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">bool insideDomain=<span class="literal">false</span>;</span><br><span class="line">Console.WriteLine(<span class="string">&quot;Enter an email address:&quot;</span>);</span><br><span class="line">string email=Console.ReadLine();</span><br><span class="line">Console.Write(<span class="string">&quot;The email domain is:&quot;</span>);</span><br><span class="line">foreach(char letter <span class="keyword">in</span> email)</span><br><span class="line">&#123;</span><br><span class="line">  <span class="keyword">if</span>(!insideDomain)</span><br><span class="line">  &#123;</span><br><span class="line">      <span class="keyword">if</span>(letter==<span class="string">&#x27;@&#x27;</span>)</span><br><span class="line">      	&#123;</span><br><span class="line">      		insideDomain=<span class="literal">true</span>;</span><br><span class="line">      	&#125;</span><br><span class="line">      	<span class="built_in">continue</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  Console.Write(letter);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>泛型</p>
+<figure class="highlight c#"><table><tr><td class="code"><pre><span class="line">Student:Person</span><br><span class="line">Person s = <span class="keyword">new</span> Person();</span><br><span class="line">s = <span class="keyword">new</span> Student();</span><br><span class="line">Person&lt;<span class="built_in">int</span>&gt; p = <span class="keyword">new</span> Person&lt;<span class="built_in">int</span>&gt;();</span><br><span class="line">p = <span class="keyword">new</span> Person&lt;<span class="built_in">string</span>&gt;();<span class="comment">//报错,泛型模板不同</span></span><br><span class="line"><span class="keyword">typeof</span>(T);<span class="comment">//编译时运行,可以获取T数据类型</span></span><br><span class="line">.Gettype();<span class="comment">//运行时执行</span></span><br><span class="line"><span class="literal">default</span>(T);<span class="comment">//泛型默认值</span></span><br></pre></td></tr></table></figure>
+
+<p>网络基本系列<br>将数据流分割多路传输,传输形式称为协议数据单元(PDU)<br>网关:主机发送消息到远端网络,必须使用路由器,也称默认网关.<br>mac地址:是生产厂商烧制录好的,物理地址,一般不能改,更换网卡后就改变. getmac或ipconfig &#x2F;all</p>
+<p>Server&#x3D;(localdb)\mssqllocaldb;Database&#x3D;CoreMoivie;Trusted_Connection&#x3D;True;MultipleActiveResultSets&#x3D;true</p>
+<figure class="highlight c#"><table><tr><td class="code"><pre><span class="line"><span class="keyword">var</span> a=<span class="keyword">new</span> [] &#123;<span class="string">&#x27;a&#x27;</span>,<span class="string">&#x27;c&#x27;</span>,<span class="string">&#x27;d&#x27;</span>,<span class="number">2</span>&#125;;<span class="comment">//var是int类型,字符可以隐式转换为无符号short整型</span></span><br><span class="line">静态字段存放在堆上,会存活到应用程序域停止</span><br><span class="line">变量和方法存放在栈上</span><br><span class="line"><span class="built_in">char</span>类型默认值  <span class="string">&#x27;/0&#x27;</span></span><br><span class="line">方法,构造函数,索引器都可以申明可选参数</span><br></pre></td></tr></table></figure>]]></content>
+      <categories>
+        <category>C#</category>
+      </categories>
+      <tags>
+        <tag>基础</tag>
+        <tag>C#</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>框架与架构设计</title>
+    <url>/2018/06/27/%E6%A1%86%E6%9E%B6%E4%B8%8E%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/</url>
+    <content><![CDATA[<h3 id="test"><a href="#test" class="headerlink" title="test"></a>test</h3><p>架构：软件体系结构通常称为架构</p>
+<p>框架与架构共同点：<br>提高生产效率<br>为了解决问题<br>都是体系化的产物<br>·····<br>不同点：<br>框架是总体规划，协调单元完成工作<br>框架是具体实施内容</p>
+]]></content>
+      <tags>
+        <tag>基础</tag>
+        <tag>架构</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>构造函数使用</title>
+    <url>/2018/06/27/%E6%9E%84%E9%80%A0%E5%87%BD%E6%95%B0%E4%BD%BF%E7%94%A8/</url>
+    <content><![CDATA[<p>任何一个类至少会有一个构造方法，即使不写，默认会有一个公开的无参构造方法：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">public class MyClass</span><br><span class="line">&#123;</span><br><span class="line">   //..</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<span id="more"></span>
+<p>它的构造方法就是：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">public <span class="function"><span class="title">Myclass</span></span>()</span><br><span class="line">&#123;</span><br><span class="line">   //..</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>当我们实例化的时候，其实调用了构造方法。</p>
+<blockquote>
+<p>可以在构造方法上写注释，new时看注释就知道了。</p>
+</blockquote>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">///&lt;summary&gt;</span><br><span class="line">///这是类</span><br><span class="line">///&lt;/summary&gt;</span><br><span class="line">public class Program</span><br><span class="line">&#123;</span><br><span class="line"> ///&lt;summary&gt;</span><br><span class="line"> ///这是构造方法</span><br><span class="line"> ///&lt;/summary&gt;</span><br><span class="line"> public <span class="function"><span class="title">Program</span></span>()</span><br><span class="line"> &#123;</span><br><span class="line">   //..</span><br><span class="line"> &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<img src='/images/构造函数.png'>
+
+<hr>
+<h3 id="通过有参数构造方法表示必填的字段，防止某些必须的字段时默认值"><a href="#通过有参数构造方法表示必填的字段，防止某些必须的字段时默认值" class="headerlink" title="通过有参数构造方法表示必填的字段，防止某些必须的字段时默认值"></a>通过有参数构造方法表示必填的字段，防止某些必须的字段时默认值</h3><blockquote>
+<p>举个例子，如下实体：</p>
+</blockquote>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">public class User</span><br><span class="line">&#123;</span><br><span class="line">  public string FirstName &#123;get;<span class="built_in">set</span>;&#125;</span><br><span class="line">  public string LastName &#123;get;<span class="built_in">set</span>;&#125;</span><br><span class="line">  public <span class="function"><span class="title">ShowName</span></span>()</span><br><span class="line">   &#123;</span><br><span class="line">     var user=new User();</span><br><span class="line">     user.FirstName=<span class="string">&quot;张&quot;</span>;</span><br><span class="line">     user.LastName=<span class="string">&quot;三&quot;</span>;</span><br><span class="line">     user.ShowName(); //输出 张三</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<blockquote>
+<p>如果少写一个的话：</p>
+</blockquote>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">static void Main(string[] args)</span><br><span class="line">&#123;</span><br><span class="line">  var user=new User();</span><br><span class="line">  user.LastName=<span class="string">&quot;三&quot;</span>;</span><br><span class="line">  user.ShowName(); // 输出 三</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这就引起不是我们想要的</p>
+<blockquote>
+<p>因此构造方法这样就可以避免了:</p>
+</blockquote>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">public class User</span><br><span class="line">&#123;</span><br><span class="line">   public User(string firstName,string lastName)</span><br><span class="line">   &#123;</span><br><span class="line">        this.FirstName=firstName;</span><br><span class="line">        tshi.LastName=lastName;</span><br><span class="line">   &#125;</span><br><span class="line">   public string FirstName &#123;get; private <span class="built_in">set</span>;&#125;</span><br><span class="line">   public string LastName &#123;get; private <span class="built_in">set</span>;&#125;</span><br><span class="line">   public string <span class="function"><span class="title">ShowName</span></span>()</span><br><span class="line">   &#123;</span><br><span class="line">        <span class="built_in">return</span> FirstName+LastName;</span><br><span class="line">   &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这里加入了两个参数，姓和名。因此实例化这个对象时必须传入这两个参数。</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">var user=new User(<span class="string">&quot;张&quot;</span>,<span class="string">&quot;三&quot;</span>);</span><br><span class="line">user.ShowName(); //输出 张三</span><br></pre></td></tr></table></figure>
+<p><font color=red>注意：set访问修饰符设置成<code>pbulic</code>属性可以被外面赋值,调用时就会有问题：</font></p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">var user=new User(<span class="string">&quot;张&quot;</span>,<span class="string">&quot;三&quot;</span>);</span><br><span class="line">user.FirstName=<span class="string">&quot;李&quot;</span>;</span><br><span class="line">user.LastName=<span class="string">&quot;四&quot;</span>;</span><br><span class="line">user.ShowName();//输出 李四</span><br></pre></td></tr></table></figure>
+<blockquote>
+<p>本文转载自 <a href="http://dotnetstar.club/c/35">http://dotnetstar.club/c/35</a></p>
+</blockquote>
+]]></content>
+      <tags>
+        <tag>基础</tag>
+        <tag>C#</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>日志&amp;Model验证</title>
+    <url>/2022/03/25/%E6%97%A5%E5%BF%97&amp;Model%E9%AA%8C%E8%AF%81/</url>
+    <content><![CDATA[<h3 id="第三方日志Serilog-AspNetCore"><a href="#第三方日志Serilog-AspNetCore" class="headerlink" title="第三方日志Serilog.AspNetCore"></a>第三方日志Serilog.AspNetCore</h3><ol>
+<li>NuGet安装Serilog.AspNetCore，Serilog.Sinks.Console(调试控制台显示日志),Serilog.Sinks.File</li>
+<li>Main方法里： <span id="more"></span>
+<figure class="highlight c#"><table><tr><td class="code"><pre><span class="line">Log.Logger = <span class="keyword">new</span> LoggerConfiguration()</span><br><span class="line">             .MinimumLevel.Debug()<span class="comment">//最下级别Debug</span></span><br><span class="line">             <span class="comment">//遇到Microsoft命名空间最低级别Information</span></span><br><span class="line">             .MinimumLevel.Override(<span class="string">&quot;Microsoft&quot;</span>,LogEventLevel.Information) </span><br><span class="line">             .Enrich.FromLogContext()<span class="comment">//通过上下文可以记录其他信息</span></span><br><span class="line">             .WriteTo.Console()</span><br><span class="line">             <span class="comment">//日志文件创建在logs文件夹里，每天一个</span></span><br><span class="line">             .WriteTo</span><br><span class="line">             .File(Path.Combine(<span class="string">&quot;logs&quot;</span>,<span class="string">&quot;log.txt&quot;</span>),rollingInterval:RollingInterval.Day)</span><br><span class="line">             .CreateLogger();</span><br><span class="line">使用：</span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> IWebHostBuilder <span class="title">CreateWebHostBuilder</span>(<span class="params"><span class="built_in">string</span>[] args</span>)</span> =&gt;</span><br><span class="line">	      WebHost.CreateDefaultBuilder(args)</span><br><span class="line">	      .UseSerilog()<span class="comment">//使用日志</span></span><br><span class="line">	      .UseStartup&lt;Startup&gt;();            </span><br></pre></td></tr></table></figure></li>
+</ol>
+<h3 id="Model验证"><a href="#Model验证" class="headerlink" title="Model验证"></a>Model验证</h3><figure class="highlight c#"><table><tr><td class="code"><pre><span class="line"><span class="number">1.</span> 写一个验证已存在角色方法：</span><br><span class="line">[<span class="meta">AcceptVerbs(<span class="string">&quot;Get&quot;</span>,<span class="string">&quot;Post&quot;</span>)</span>]<span class="comment">//接受get，post请求</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">async</span> Task&lt;IActionResult&gt; <span class="title">CheckRoleExit</span>(<span class="params">[Bind(<span class="string">&quot;RoleName&quot;</span></span>)] <span class="built_in">string</span> roleName)</span></span><br><span class="line">&#123;<span class="comment">//Bind 只接收View传过来的RoleName</span></span><br><span class="line">	<span class="keyword">var</span> role = <span class="keyword">await</span> _roleManager.FindByNameAsync(roleName);</span><br><span class="line">	<span class="keyword">if</span>(role!=<span class="literal">null</span>)</span><br><span class="line">	&#123;</span><br><span class="line">		<span class="keyword">return</span> Json(<span class="string">&quot;角色已存在！&quot;</span>);<span class="comment">//return Json(false); //返回ErrorMessage里的值</span></span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">return</span> Json(<span class="literal">true</span>);</span><br><span class="line">&#125;</span><br><span class="line"><span class="number">2.</span> Remote在前台直接调用CheckRoleExist方法验证角色是否存在</span><br><span class="line">在添加角色的RoleAddViewModel里：</span><br><span class="line">[<span class="meta">Remote(nameof(RoleController.CheckRoleExit),<span class="string">&quot;Role&quot;</span>,ErrorMessage = <span class="string">&quot;角色存在&quot;</span>)</span>]</span><br><span class="line"><span class="keyword">public</span> <span class="built_in">string</span> RoleName&#123;<span class="keyword">get</span>;<span class="keyword">set</span>;&#125;</span><br><span class="line"></span><br><span class="line"><span class="number">3.</span> 在AddRole页面：</span><br><span class="line">@model MyWeb.ViewModels.RoleAddViewModel</span><br><span class="line"></span><br><span class="line">&lt;form method=<span class="string">&quot;post&quot;</span>&gt;</span><br><span class="line">&lt;input <span class="keyword">class</span> = <span class="string">&quot;form-control&quot;</span> asp-<span class="keyword">for</span>=<span class="string">&quot;RoleName&quot;</span>/&gt;</span><br><span class="line">&lt;span <span class="keyword">class</span> = <span class="string">&quot;invalid&quot;</span> asp-validation-<span class="keyword">for</span>=<span class="string">&quot;RoleName&quot;</span>&gt;&lt;/span&gt;</span><br><span class="line"></span><br><span class="line">在没有提交刷新情况下会验证角色是否已存在</span><br></pre></td></tr></table></figure>
+
+]]></content>
+      <categories>
+        <category>Web</category>
+      </categories>
+      <tags>
+        <tag>Asp.Net Core</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>缓存&amp;数据压缩&amp;token</title>
+    <url>/2022/03/25/%E7%BC%93%E5%AD%98&amp;%E6%95%B0%E6%8D%AE%E5%8E%8B%E7%BC%A9&amp;token/</url>
+    <content><![CDATA[<h3 id="客户端Response缓存："><a href="#客户端Response缓存：" class="headerlink" title="客户端Response缓存："></a>客户端Response缓存：</h3><ol>
+<li>基于Header</li>
+<li>客户端缓存</li>
+<li>使用ResponseCache这个Attribute <span id="more"></span></li>
+</ol>
+<figure class="highlight c#"><table><tr><td class="code"><pre><span class="line">在 Startup 里设置:</span><br><span class="line"></span><br><span class="line">services.AddMvc(options=&gt;</span><br><span class="line">&#123;</span><br><span class="line">	options.CacheProfiles.Add(<span class="string">&quot;Default&quot;</span>,<span class="keyword">new</span> CacheProfile</span><br><span class="line">	&#123;</span><br><span class="line">      Duration=<span class="number">30</span><span class="comment">//30秒后缓存过期</span></span><br><span class="line">   &#125;);</span><br><span class="line">&#125;);</span><br><span class="line"></span><br><span class="line">在Controller使用：</span><br><span class="line"><span class="comment">//缓存保存时间30秒，保存位置在客户端。前进后退可用，刷新重新请求</span></span><br><span class="line"><span class="comment">//[ResponseCache(Duration=30,Location=ResponseCacheLocation.Client)]</span></span><br><span class="line">[<span class="meta">ResponseCache(CacheProfileName=<span class="string">&quot;Default&quot;</span>)</span>]</span><br><span class="line"><span class="function"><span class="keyword">public</span> IActionResult <span class="title">Index</span>()</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="keyword">return</span> View();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<hr>
+<h3 id="服务器端缓存"><a href="#服务器端缓存" class="headerlink" title="服务器端缓存:"></a>服务器端缓存:</h3><figure class="highlight c#"><table><tr><td class="code"><pre><span class="line">Startup里:</span><br><span class="line">services.AddMemoryCache();</span><br><span class="line">使用：</span><br><span class="line"><span class="number">1.</span> 新建一个类，存储缓存的key：</span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title">CacheEntryConstants</span></span><br><span class="line">&#123;</span><br><span class="line">	 <span class="comment">//声明一个缓存的key ：AlbumsOfDay，值是它的字符串</span></span><br><span class="line">	<span class="keyword">public</span> <span class="keyword">const</span> <span class="built_in">string</span> AlbumOfDay = <span class="keyword">nameof</span>(AlbumOfDay);</span><br><span class="line">&#125;</span><br><span class="line"><span class="number">2.</span></span><br><span class="line"><span class="keyword">private</span> <span class="keyword">readonly</span> IMermoryCache _memoryCache;</span><br><span class="line"><span class="keyword">private</span> <span class="keyword">readonly</span> IAlbumService _albumService;</span><br><span class="line"><span class="keyword">private</span> <span class="keyword">readonly</span> HtmlEncoder _htmlEncoder;<span class="comment">//防御xss恶意代码</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="title">AlbumController</span>(<span class="params">IMermoryCache memoryCache,IAlbumService albumService,HtmlEncoder htmlEncoder</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="keyword">this</span>._memoryCache = memoryCache;</span><br><span class="line">	<span class="keyword">this</span>._albumService = albumService;</span><br><span class="line">	<span class="keyword">this</span>._htmlEncoder = htmlEncoder;</span><br><span class="line">&#125;</span><br><span class="line"><span class="number">3.</span>缓存Album这个页面:</span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">async</span> Task&lt;IActionResult&gt; <span class="title">Index</span>()</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="comment">//参数（缓存的key，缓存的值）</span></span><br><span class="line">	<span class="keyword">if</span>(!_memoryCache.TryGetValue(CacheEntryConstants.AlbumsOfDay, </span><br><span class="line">		<span class="keyword">out</span> LIst&lt;Album&gt; cacheAlbums))</span><br><span class="line">	&#123;  <span class="comment">//缓存为空，获取值放入缓存</span></span><br><span class="line">       cacheAlbums = <span class="keyword">await</span> _albumService.GetAll();</span><br><span class="line">       <span class="keyword">var</span> cacheEntryOptions = <span class="keyword">new</span> MemoryCacheEntryOptions()</span><br><span class="line">                                <span class="comment">//在20秒内获取缓存值，过期时间延后20秒</span></span><br><span class="line">                               .SetSlidingExpiration(TimeSpan.FromSeconds(<span class="number">20</span>));</span><br><span class="line">                               <span class="comment">//缓存20秒就过期</span></span><br><span class="line">                               <span class="comment">//.SetAbsoluteExpiration(TimeSpan.FromSeconds(20));</span></span><br><span class="line">       <span class="comment">//设置缓存的值</span></span><br><span class="line">       _memoryCache.Set(CacheEntryConstants.AlbumsOfDay, cacheAlbums, cacheEntryOptions);                        </span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">return</span> View(cacheAlbums);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="为提交数据做处理："><a href="#为提交数据做处理：" class="headerlink" title="为提交数据做处理："></a>为提交数据做处理：</h3><figure class="highlight c#"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">async</span> Task&lt;IActionResult&gt; <span class="title">Create</span>()</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="keyword">var</span> <span class="keyword">new</span> Model = <span class="keyword">await</span> _albumService.AddAsync(<span class="keyword">new</span> Album</span><br><span class="line">	&#123;   <span class="comment">//为提交的数据做处理</span></span><br><span class="line">		Artist = _htmlEncoder.Encode(albumCreateViewModel.Artist),</span><br><span class="line">		........</span><br><span class="line">	&#125;)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+<h3 id="使用数据压缩功能"><a href="#使用数据压缩功能" class="headerlink" title="使用数据压缩功能:"></a>使用数据压缩功能:</h3><p>添加服务：</p>
+<figure class="highlight c#"><table><tr><td class="code"><pre><span class="line">services.AddResponseCompression();</span><br></pre></td></tr></table></figure>
+<p>使用：</p>
+<figure class="highlight c#"><table><tr><td class="code"><pre><span class="line">app.UseReponseCompression();</span><br></pre></td></tr></table></figure>
+
+<h3 id="Token防跨站伪造："><a href="#Token防跨站伪造：" class="headerlink" title="Token防跨站伪造："></a>Token防跨站伪造：</h3><figure class="highlight c#"><table><tr><td class="code"><pre><span class="line"><span class="comment">//为所有post添加token标签</span></span><br><span class="line">services.AddMvc(opt=&gt;</span><br><span class="line">&#123;  <span class="comment">//在不需要token的post上添加 [IgnoreAntiforgeryToken]</span></span><br><span class="line">   opt.Filters.Add(<span class="keyword">new</span> AutoValidateAntiforgeryTokenAttribute());</span><br><span class="line">&#125;);</span><br><span class="line"><span class="comment">//单个方法添加token： </span></span><br><span class="line">[<span class="meta">ValidateAntiForgeryToken</span>]</span><br></pre></td></tr></table></figure>
+<h3 id="ef-mvc使用缓存"><a href="#ef-mvc使用缓存" class="headerlink" title="ef mvc使用缓存"></a>ef mvc使用缓存</h3><figure class="highlight c#"><table><tr><td class="code"><pre><span class="line"><span class="number">1</span>,在要缓存的页面Action上:[OutputCache(Duration = <span class="number">60</span>, VaryByParam = <span class="string">&quot;*&quot;</span>)]<span class="comment">//缓存60秒,任意参数改变,缓存就改变</span></span><br><span class="line"><span class="number">2</span>,在有部分页的主页使用了缓存,子页面也会缓存,这时要使用MvcDonutCaching包,在主页方法上[DonutOutputCache].</span><br></pre></td></tr></table></figure>
+]]></content>
+      <categories>
+        <category>Web</category>
+      </categories>
+      <tags>
+        <tag>Asp.Net Core</tag>
+      </tags>
+  </entry>
+</search>
